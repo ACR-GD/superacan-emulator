@@ -119,7 +119,10 @@ int main(int argc, char* argv[]) {
     }
 
     // If DAT path not specified, check if 08002 (Taiwan).bin or translated DAT exists
-    if (dat_path.empty()) {
+    // A ROM file over 2 MB carries its own data ROM (Sango Fighter, translation patches); don't override it.
+    long prg_size = 0;
+    if (FILE* pf = fopen(prg_path.c_str(), "rb")) { fseek(pf, 0, SEEK_END); prg_size = ftell(pf); fclose(pf); }
+    if (dat_path.empty() && prg_size <= 0x200000) {
         std::vector<std::string> candidates = {
             "build/Super-Dragon-Force_DAT_EN.bin",
             "Super-Dragon-Force_Super-Acan_ZH-TW/08002 (Taiwan).bin",
