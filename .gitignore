@@ -1,0 +1,12 @@
+.DS_Store
+build_obj/
+*.app
+superacan-emu
+# no game or console ROMs, ever
+ROMs/
+*.bin
+*.zip
+*.7z
+*.sta
+nvram/
+cfg/

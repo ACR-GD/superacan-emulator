@@ -1,0 +1,6 @@
+[submodule "deps/mister"]
+	path = deps/mister
+	url = https://github.com/MiSTer-devel/SuperACan_MiSTer.git
+[submodule "deps/musashi"]
+	path = deps/musashi
+	url = https://github.com/kstenerud/Musashi.git
