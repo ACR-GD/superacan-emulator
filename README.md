@@ -1,8 +1,17 @@
 # Super A'Can Emulator
 
-A native macOS emulator for the Funtech Super A'Can. The app is written in AppKit with CoreAudio
-and GameController and has no SDL dependency. The design uses the console's own colours: shell
-gray and A'Can green.
+An emulator for the Funtech Super A'Can: a native macOS app, a standalone build for Windows and
+Linux, and a RetroArch core for Windows, Linux, macOS and Android (see
+[Windows, Linux, Android and RetroArch](#windows-linux-android-and-retroarch)). The macOS app is
+written in AppKit with CoreAudio and GameController and has no SDL dependency. The design uses the
+console's own colours: shell gray and A'Can green.
+
+![Best of: twelve Super A'Can games running in the emulator, all with English translation patches: Super Dragon Force, The Son of Evil, Rebel Star, Sango Fighter, Speedy Dragon, Journey to the Laugh, Boom Zoo, Formosa Duel, Monopoly: Adventure in Africa, Super Taiwanese Baseball League, Magical Pool and Gambling Lord](screenshots/bestof.png)
+
+The whole Super A'Can library, running in this emulator with the English translation patches from
+[ACR-GD](https://github.com/ACR-GD): Super Dragon Force, The Son of Evil, Rebel Star, Sango Fighter,
+Speedy Dragon, Journey to the Laugh, Boom Zoo, Formosa Duel, Monopoly: Adventure in Africa, Super
+Taiwanese Baseball League, Magical Pool and Gambling Lord.
 
 ## Build
 
