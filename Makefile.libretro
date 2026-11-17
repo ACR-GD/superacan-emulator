@@ -22,7 +22,7 @@ ifeq ($(platform),osx)
   ARCHFLAGS := -mmacosx-version-min=10.13
 else ifeq ($(platform),win)
   TARGET  := $(TARGET_NAME)_libretro.dll
-  SHARED  := -shared -static-libgcc -static-libstdc++ -Wl,--no-undefined
+  SHARED  := -shared -static -Wl,--no-undefined   # no MinGW runtime DLLs to ship with RetroArch
 else
   TARGET  := $(TARGET_NAME)_libretro.so
   SHARED  := -shared -Wl,--no-undefined

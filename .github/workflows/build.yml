@@ -52,9 +52,10 @@ jobs:
       - name: package
         run: |
           mkdir -p out/superacan-emu-windows-x64
-          cp superacan-emu.exe /mingw64/bin/SDL2.dll README.md LICENSE out/superacan-emu-windows-x64/
+          cp superacan-emu.exe /mingw64/bin/SDL2.dll /mingw64/bin/libwinpthread-1.dll README.md LICENSE out/superacan-emu-windows-x64/
           (cd out && zip -r ../superacan-emu-windows-x64.zip superacan-emu-windows-x64)
           zip -j superacan_libretro-windows-x64.zip superacan_libretro.dll superacan_libretro.info
+          ! objdump -p superacan_libretro.dll | grep -iE "DLL Name: (libwinpthread|libgcc|libstdc)"
       - uses: actions/upload-artifact@v4
         with:
           name: windows

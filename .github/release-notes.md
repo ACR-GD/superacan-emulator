@@ -2,7 +2,7 @@
 
 | File | What it is |
 |---|---|
-| `superacan-emu-windows-x64.zip` | Windows standalone emulator (SDL2, `SDL2.dll` included) |
+| `superacan-emu-windows-x64.zip` | Windows standalone emulator (SDL2; `SDL2.dll` and `libwinpthread-1.dll` included) |
 | `superacan-emu-linux-x86_64.tar.gz` | Linux standalone emulator (needs SDL2: `sudo apt install libsdl2-2.0-0`) |
 | `superacan_libretro-windows-x64.zip` | RetroArch core for Windows |
 | `superacan_libretro-linux-x86_64.zip` | RetroArch core for Linux |
