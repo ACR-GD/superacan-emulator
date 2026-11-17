@@ -60,6 +60,33 @@ sound CPU and sampler, timers and DMA. Loading a state reproduces the following 
 bit-for-bit (`make test`). Each state is tagged with a fingerprint of the ROM, so it can only be
 loaded into the game it came from.
 
+## Windows, Linux, Android and RetroArch
+
+Prebuilt files are on the [Releases](https://github.com/ACR-GD/superacan-emulator/releases) page:
+a standalone emulator for Windows and Linux, and a libretro core for RetroArch on Windows, Linux,
+macOS and Android.
+
+- **Standalone (Windows / Linux):** `superacan-emu game.bin`, or drop a ROM onto the program or its
+  window. Keys: arrows = D-pad, Z/X = A/B, A/S = X/Y, Q/W = L/R, Enter = Start, Space = Select.
+- **RetroArch:** put the core in RetroArch's `cores` folder and `superacan_libretro.info` in `info`.
+  On Android use *Load Core → Install or Restore a Core*. Save states, `.srm` battery saves and two
+  controllers are supported; the *Sound style* core option switches accurate/sustained envelopes.
+  Optional console ROMs go in `system/superacan/`. Super Dragon Force's data ROM (`08002`) must sit
+  next to the game.
+
+Build them yourself:
+
+```bash
+make                                  # standalone SDL2 build (macOS, Linux, Windows/MSYS2 MinGW64)
+make -f Makefile.libretro             # libretro core for this OS (.so / .dylib / .dll)
+make -f Makefile.libretro deps/musashi/m68kops.c && ndk-build -C jni   # Android cores
+c++ -std=c++17 -Ideps/libretro tests/libretro_test.cpp -o lrtest && ./lrtest ./superacan_libretro.so game.bin 1500 out.ppm
+```
+
+The last line checks a core without RetroArch: it runs a game, writes the last frame and checks
+that a save state replays identically. `.github/workflows/build.yml` builds everything on GitHub
+Actions and publishes a release for each `v*` tag.
+
 ## Building
 
 ```
@@ -75,6 +102,8 @@ ROMs are optional: put `internal_68k.bin`, `umc6650.bin` and the 6502 ROMs in a 
 ## Layout
 
 ```
+src/main.cpp        SDL2 frontend (Windows, Linux, command line)
+src/libretro/       libretro core (RetroArch)
 src/mac/app.mm      native frontend (library, game view, pause menu, audio, input, menus)
 src/emu.*           machine (68000 via Musashi + bus + PPU + APU)
 src/video/ppu.*     UM6618 video: 4 tile layers, ROZ, sprites

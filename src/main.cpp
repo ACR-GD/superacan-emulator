@@ -8,7 +8,12 @@
 #include "config.h"
 #include "savestate.h"
 #include <cstdio>
+#include <cmath>
+#if defined(__x86_64__) || defined(_M_X64)
+#include <immintrin.h>   // _mm_pause in the frame limiter
+#endif
 
+#ifdef __APPLE__
 // Native macOS file picker (returns empty string if cancelled)
 static std::string pick_rom_file() {
     FILE* p = popen("osascript -e 'try' -e 'POSIX path of (choose file with prompt \"Select a Super A'\\''Can ROM (.bin)\")' -e 'end try' 2>/dev/null", "r");
@@ -19,6 +24,62 @@ static std::string pick_rom_file() {
     pclose(p);
     while (!out.empty() && (out.back() == '\n' || out.back() == '\r' || out.back() == ' ')) out.pop_back();
     return (!out.empty() && out[0] == '/') ? out : "";
+}
+#else
+// Windows / Linux: a small window that waits for a ROM file to be dropped on it. (A ROM can also
+// be passed on the command line, or dropped onto the program's icon.)
+static std::string pick_rom_file() {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) < 0) return "";
+    SDL_Window* w = SDL_CreateWindow("Drop a Super A'Can ROM (.bin) on this window",
+                                     SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 240, SDL_WINDOW_SHOWN);
+    if (!w) return "";
+    SDL_Renderer* r = SDL_CreateRenderer(w, -1, 0);
+    SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
+    std::string out;
+    for (bool done = false; !done;) {
+        SDL_Event e;
+        while (SDL_PollEvent(&e)) {
+            if (e.type == SDL_QUIT) done = true;
+            if (e.type == SDL_DROPFILE) { out = e.drop.file; SDL_free(e.drop.file); done = true; }
+        }
+        if (r) {   // A'Can green, so the window is recognisable
+            SDL_SetRenderDrawColor(r, 0x2E, 0x7D, 0x5B, 255); SDL_RenderClear(r);
+            SDL_SetRenderDrawColor(r, 0xD8, 0xD8, 0xD0, 255);
+            SDL_Rect frame = {40, 40, 560, 160}; SDL_RenderDrawRect(r, &frame);
+            SDL_RenderPresent(r);
+        }
+        SDL_Delay(16);
+    }
+    if (r) SDL_DestroyRenderer(r);
+    SDL_DestroyWindow(w);
+    return out;
+}
+#endif
+
+// Keyboard layout, as the macOS app.
+static const struct { SDL_Keycode key; JoypadButton btn; } KEYS[] = {
+    {SDLK_UP, BTN_UP}, {SDLK_DOWN, BTN_DOWN}, {SDLK_LEFT, BTN_LEFT}, {SDLK_RIGHT, BTN_RIGHT},
+    {SDLK_z, BTN_A}, {SDLK_x, BTN_B}, {SDLK_a, BTN_X}, {SDLK_s, BTN_Y},
+    {SDLK_q, BTN_L}, {SDLK_w, BTN_R}, {SDLK_RETURN, BTN_START}, {SDLK_KP_ENTER, BTN_START},
+    {SDLK_SPACE, BTN_SELECT},
+};
+static const struct { int sdl; JoypadButton btn; } PAD[] = {
+    {SDL_CONTROLLER_BUTTON_DPAD_UP, BTN_UP}, {SDL_CONTROLLER_BUTTON_DPAD_DOWN, BTN_DOWN},
+    {SDL_CONTROLLER_BUTTON_DPAD_LEFT, BTN_LEFT}, {SDL_CONTROLLER_BUTTON_DPAD_RIGHT, BTN_RIGHT},
+    {SDL_CONTROLLER_BUTTON_B, BTN_A}, {SDL_CONTROLLER_BUTTON_A, BTN_B},
+    {SDL_CONTROLLER_BUTTON_Y, BTN_X}, {SDL_CONTROLLER_BUTTON_X, BTN_Y},
+    {SDL_CONTROLLER_BUTTON_LEFTSHOULDER, BTN_L}, {SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, BTN_R},
+    {SDL_CONTROLLER_BUTTON_START, BTN_START}, {SDL_CONTROLLER_BUTTON_BACK, BTN_SELECT},
+};
+
+static void save_sram(SuperAcan& emu, const std::string& path) {
+    auto& sram = emu.get_bus().get_sram();
+    if (FILE* f = fopen(path.c_str(), "wb")) { fwrite(sram.data(), 1, sram.size(), f); fclose(f); }
+}
+
+static std::string window_title(const std::string& rom) {
+    std::string name = rom.substr(rom.find_last_of("/\\") + 1);
+    return "Super A'Can Emulator - " + name.substr(0, name.find_last_of('.'));
 }
 
 int main(int argc, char* argv[]) {
@@ -131,7 +192,7 @@ int main(int argc, char* argv[]) {
             "../Super-Dragon-Force_Super-Acan_ZH-TW/08002 (Taiwan).bin"
         };
         // Also search relative to the ROM's own folder (cwd is "/" when launched from Finder)
-        std::string rom_dir = prg_path.substr(0, prg_path.find_last_of('/') + 1);
+        std::string rom_dir = prg_path.substr(0, prg_path.find_last_of("/\\") + 1);
         if (!rom_dir.empty()) {
             candidates.insert(candidates.begin(), {
                 rom_dir + "Super-Dragon-Force_DAT_EN.bin",
@@ -345,7 +406,7 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER) < 0) {
         std::cerr << "[Main] SDL_Init Error: " << SDL_GetError() << "\n";
         return 1;
     }
@@ -355,7 +416,7 @@ int main(int argc, char* argv[]) {
     const int WIN_HEIGHT = PPU::SCREEN_HEIGHT * SCALE; // 720
 
     SDL_Window* window = SDL_CreateWindow(
-        "Super A'Can Emulator - Super Dragon Force",
+        window_title(prg_path).c_str(),
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         WIN_WIDTH, WIN_HEIGHT,
         SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN
@@ -416,7 +477,7 @@ int main(int argc, char* argv[]) {
 
     
     std::cout << "====================================================================\n";
-    std::cout << " Super A'Can Standalone Emulator - Super Dragon Force\n";
+    std::cout << " Super A'Can Standalone Emulator\n";
     std::cout << " Controls:\n";
     std::cout << "   D-Pad / Move:       Arrow Keys or WASD\n";
     std::cout << "   Confirm / Talk:     Z, Space, Enter, or J\n";
@@ -428,6 +489,15 @@ int main(int argc, char* argv[]) {
 
     bool quit = false;
     SDL_Event event;
+    // Battery save RAM lives next to the ROM: "game.bin" -> "game.sav".
+    const std::string sram_path = prg_path.substr(0, prg_path.find_last_of('.')) + ".sav";
+    int sram_check = 0;
+    if (FILE* f = fopen(sram_path.c_str(), "rb")) {
+        auto& sram = emu.get_bus().get_sram();
+        if (fread(sram.data(), 1, sram.size(), f) == sram.size()) std::cout << "[Main] Loaded " << sram_path << "\n";
+        fclose(f);
+        emu.get_bus().take_sram_dirty();
+    }
 
     // High-resolution frame timing
     using clock = std::chrono::high_resolution_clock;
@@ -493,72 +563,29 @@ int main(int argc, char* argv[]) {
                         }
                         break;
 
-                    // D-Pad: Arrows or WASD
-                    case SDLK_UP:
-                    case SDLK_w:
-                        emu.get_joypad().set_button(0, BTN_UP, pressed);
-                        break;
-                    case SDLK_DOWN:
-                    case SDLK_s:
-                        emu.get_joypad().set_button(0, BTN_DOWN, pressed);
-                        break;
-                    case SDLK_LEFT:
-                    case SDLK_a:
-                        emu.get_joypad().set_button(0, BTN_LEFT, pressed);
-                        break;
-                    case SDLK_RIGHT:
-                    case SDLK_d:
-                        emu.get_joypad().set_button(0, BTN_RIGHT, pressed);
-                        break;
-
-                    // Confirm / Talk / Advance (Primary Action): Z, Space, Enter, J
-                    case SDLK_z:
-                    case SDLK_j:
-                    case SDLK_SPACE:
-                        emu.get_joypad().set_button(0, BTN_B, pressed);
-                        emu.get_joypad().set_button(0, BTN_A, pressed);
-                        break;
-
-                    // Enter / Return: Start + Confirm
-                    case SDLK_RETURN:
-                    case SDLK_KP_ENTER:
-                        emu.get_joypad().set_button(0, BTN_START, pressed);
-                        emu.get_joypad().set_button(0, BTN_B, pressed);
-                        break;
-
-                    // Cancel / Menu (Secondary Action): X, K, Backspace
-                    case SDLK_x:
-                    case SDLK_k:
-                    case SDLK_BACKSPACE:
-                        emu.get_joypad().set_button(0, BTN_Y, pressed);
-                        break;
-
-                    // Sub-actions
-                    case SDLK_c:
-                    case SDLK_u:
-                        emu.get_joypad().set_button(0, BTN_X, pressed);
-                        break;
-                    case SDLK_v:
-                    case SDLK_i:
-                        emu.get_joypad().set_button(0, BTN_R, pressed);
-                        break;
-                    case SDLK_q:
-                    case SDLK_o:
-                        emu.get_joypad().set_button(0, BTN_L, pressed);
-                        break;
-
-                    // Select
-                    case SDLK_RSHIFT:
-                    case SDLK_LSHIFT:
-                    case SDLK_TAB:
-                        emu.get_joypad().set_button(0, BTN_SELECT, pressed);
-                        break;
-
                     default:
+                        for (auto& k : KEYS)
+                            if (k.key == event.key.keysym.sym) emu.get_joypad().set_button(0, k.btn, pressed);
                         break;
                 }
+            } else if (event.type == SDL_CONTROLLERDEVICEADDED) {
+                SDL_GameControllerOpen(event.cdevice.which);
+            } else if (event.type == SDL_CONTROLLERBUTTONDOWN || event.type == SDL_CONTROLLERBUTTONUP) {
+                // First two controllers = players 1 and 2; buttons by position (SNES-style pad).
+                int player = -1;
+                for (int i = 0, n = 0; i < SDL_NumJoysticks() && n < 2; i++) {
+                    if (!SDL_IsGameController(i)) continue;
+                    if (SDL_JoystickGetDeviceInstanceID(i) == event.cbutton.which) { player = n; break; }
+                    n++;
+                }
+                for (auto& m : PAD)
+                    if (player >= 0 && m.sdl == event.cbutton.button)
+                        emu.get_joypad().set_button(player, m.btn, event.type == SDL_CONTROLLERBUTTONDOWN);
             }
         }
+
+        // Battery save RAM: written next to the ROM shortly after the game changes it.
+        if (++sram_check % 60 == 0 && emu.get_bus().take_sram_dirty()) save_sram(emu, sram_path);
 
         // Run emulation for 1 full frame (262 scanlines, ~178,977 CPU cycles)
         emu.run_frame();
@@ -614,7 +641,7 @@ int main(int argc, char* argv[]) {
         std::chrono::duration<double> elapsed = now - last_fps_time;
         if (elapsed.count() >= 1.0) {
             double fps = frame_count / elapsed.count();
-            std::string title = "Super A'Can Emulator - Super Dragon Force [" + std::to_string(static_cast<int>(std::round(fps))) + " FPS]";
+            std::string title = window_title(prg_path) + " [" + std::to_string(static_cast<int>(std::round(fps))) + " FPS]";
             SDL_SetWindowTitle(window, title.c_str());
             frame_count = 0;
             last_fps_time = now;
@@ -644,6 +671,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    if (emu.get_bus().take_sram_dirty()) save_sram(emu, sram_path);
     if (audio_dev) {
         SDL_CloseAudioDevice(audio_dev);
     }
@@ -651,7 +679,6 @@ int main(int argc, char* argv[]) {
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
-    SDL_Quit();
     SDL_Quit();
 
     return 0;

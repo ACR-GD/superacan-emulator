@@ -1,0 +1,14 @@
+# Sources and flags shared by the libretro builds (Makefile.libretro, jni/Android.mk).
+CORE_DIR ?= .
+
+MUSASHI_SRCS := deps/musashi/m68kcpu.c deps/musashi/m68kops.c deps/musashi/softfloat/softfloat.c
+
+LIBRETRO_SRCS := src/bus/bus.cpp src/video/ppu.cpp src/sound/apu.cpp src/emu.cpp \
+                 src/libretro/libretro.cpp
+
+CORE_DEFINES := -DM68K_EMULATE_010=M68K_OPT_OFF -DM68K_EMULATE_EC020=M68K_OPT_OFF \
+                -DM68K_EMULATE_020=M68K_OPT_OFF -DM68K_EMULATE_030=M68K_OPT_OFF \
+                -DM68K_EMULATE_040=M68K_OPT_OFF -DM68K_EMULATE_INT_ACK=M68K_OPT_ON \
+                -DM68K_EMULATE_PREFETCH=M68K_OPT_ON
+
+CORE_INCLUDES := -I$(CORE_DIR)/src -I$(CORE_DIR)/deps/musashi -I$(CORE_DIR)/deps/libretro

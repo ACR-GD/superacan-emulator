@@ -10,3 +10,12 @@ ROMs/
 *.sta
 nvram/
 cfg/
+# build outputs
+*.so
+*.dylib
+*.dll
+*.exe
+libs/
+obj/
+deps/musashi/m68kmake
+lrtest

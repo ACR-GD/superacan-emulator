@@ -1,18 +1,28 @@
-CXX ?= clang++
-CC ?= clang
+UNAME := $(shell uname -s)
+SDL2_CFLAGS := $(shell sdl2-config --cflags)
+SDL2_LIBS   := $(shell sdl2-config --libs)
+ifneq ($(findstring Darwin,$(UNAME)),)
+  CXX ?= clang++
+  CC ?= clang
+  SDL2_CFLAGS := $(shell /opt/homebrew/bin/sdl2-config --cflags 2>/dev/null || sdl2-config --cflags)
+  SDL2_LIBS   := $(shell /opt/homebrew/bin/sdl2-config --libs 2>/dev/null || sdl2-config --libs)
+  MACFLAGS := -mmacosx-version-min=12.0
+endif
+EXE :=
+ifneq ($(findstring MINGW,$(UNAME))$(findstring MSYS,$(UNAME)),)
+  EXE := .exe
+  LDFLAGS_EXTRA := -static-libgcc -static-libstdc++
+endif
 
-SDL2_CFLAGS := $(shell /opt/homebrew/bin/sdl2-config --cflags 2>/dev/null || sdl2-config --cflags)
-SDL2_LIBS   := $(shell /opt/homebrew/bin/sdl2-config --libs 2>/dev/null || sdl2-config --libs)
-
-CFLAGS   := -O3 -I./deps/musashi -mmacosx-version-min=12.0 \
+CFLAGS   := -O3 -I./deps/musashi $(MACFLAGS) \
             -DM68K_EMULATE_010=M68K_OPT_OFF -DM68K_EMULATE_EC020=M68K_OPT_OFF \
             -DM68K_EMULATE_020=M68K_OPT_OFF -DM68K_EMULATE_030=M68K_OPT_OFF -DM68K_EMULATE_040=M68K_OPT_OFF \
             -DM68K_EMULATE_INT_ACK=M68K_OPT_ON -DM68K_EMULATE_PREFETCH=M68K_OPT_ON
 CXXFLAGS := -MMD -MP -O3 -std=c++17 -I./src -I./deps/musashi $(SDL2_CFLAGS)
-LDFLAGS  := $(SDL2_LIBS)
+LDFLAGS  := $(SDL2_LIBS) $(LDFLAGS_EXTRA)
 
 BUILD_DIR := build_obj
-TARGET    := superacan-emu
+TARGET    := superacan-emu$(EXE)
 
 # Musashi C sources
 C_SRCS := deps/musashi/m68kcpu.c \

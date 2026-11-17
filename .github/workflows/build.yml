@@ -1,0 +1,109 @@
+name: build
+
+# Standalone emulator (Windows, Linux) and libretro cores (Windows, Linux, macOS, Android).
+# Every push builds; a v* tag also publishes the files as a GitHub release.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04          # older glibc, so the binaries run on more distributions
+    steps:
+      - uses: actions/checkout@v4
+      - run: git submodule update --init deps/musashi
+      - run: sudo apt-get update && sudo apt-get install -y libsdl2-dev
+      - run: make -j4 && make -f Makefile.libretro -j4
+      - name: package
+        run: |
+          mkdir -p out/superacan-emu-linux-x86_64
+          cp superacan-emu README.md LICENSE out/superacan-emu-linux-x86_64/
+          tar -C out -czf superacan-emu-linux-x86_64.tar.gz superacan-emu-linux-x86_64
+          zip -j superacan_libretro-linux-x86_64.zip superacan_libretro.so superacan_libretro.info
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            superacan-emu-linux-x86_64.tar.gz
+            superacan_libretro-linux-x86_64.zip
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: >-
+            make zip git
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-SDL2
+      - run: git submodule update --init deps/musashi
+      - run: make -j4 CC=gcc CXX=g++ HOSTCC=gcc && make -f Makefile.libretro -j4 CC=gcc CXX=g++ HOSTCC=gcc
+      - name: package
+        run: |
+          mkdir -p out/superacan-emu-windows-x64
+          cp superacan-emu.exe /mingw64/bin/SDL2.dll README.md LICENSE out/superacan-emu-windows-x64/
+          (cd out && zip -r ../superacan-emu-windows-x64.zip superacan-emu-windows-x64)
+          zip -j superacan_libretro-windows-x64.zip superacan_libretro.dll superacan_libretro.info
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            superacan-emu-windows-x64.zip
+            superacan_libretro-windows-x64.zip
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: git submodule update --init deps/musashi
+      - run: make -f Makefile.libretro -j4 ARCHFLAGS="-arch arm64 -arch x86_64 -mmacosx-version-min=10.13"
+      - run: zip -j superacan_libretro-macos.zip superacan_libretro.dylib superacan_libretro.info
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: superacan_libretro-macos.zip
+
+  android:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: git submodule update --init deps/musashi
+      - run: make -f Makefile.libretro deps/musashi/m68kops.c
+      - run: $ANDROID_NDK_LATEST_HOME/ndk-build -C jni -j4
+      - name: package
+        run: |
+          for abi in arm64-v8a armeabi-v7a x86_64 x86; do
+            mkdir -p out/$abi
+            cp libs/$abi/libretro.so out/$abi/superacan_libretro_android.so
+          done
+          cp superacan_libretro.info out/
+          (cd out && zip -r ../superacan_libretro-android.zip .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: superacan_libretro-android.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, windows, macos, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "Super A'Can Emulator $GITHUB_REF_NAME" --notes-file .github/release-notes.md
