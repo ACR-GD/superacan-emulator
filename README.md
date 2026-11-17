@@ -84,3 +84,10 @@ src/main.cpp        SDL command-line build
 tools/              make_icon.py, make_app_bundle.sh
 deps/               Musashi (68000 core) and the MiSTer Super A'Can core (submodules)
 ```
+
+
+## License
+
+The emulator source in this repository is MIT-licensed (see `LICENSE`). The submodules keep
+their own licenses: `deps/musashi` (Musashi, its own license) and `deps/mister` (the MiSTer
+Super A'Can core, GPLv2). No console or game ROMs are included.
